@@ -1,0 +1,141 @@
+# .github/workflows/create-file-pr-merge.yml
+name: Create file, open PR, and merge (via GitHub App)
+
+on:
+  workflow_dispatch:
+    inputs:
+      filename:
+        description: "Filename to create (relative to repo root)"
+        required: true
+        default: "dummy.txt"
+      file_content:
+        description: "Content for the new file"
+        required: true
+        default: "This is a test file created by org-level-automation-app."
+      base_branch:
+        description: "Target branch for the PR"
+        required: true
+        default: "main"
+
+jobs:
+  create-pr-and-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create App installation token
+        id: app_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+        # NOTE: Ensure the app's permissions (in the GitHub App configuration) include:
+        #   - Repository contents: Write
+        #   - Pull requests: Write
+        # and that the app is installed on this repository.
+
+      - name: Checkout repository using app token
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app_token.outputs.token }}
+          persist-credentials: true  # ensure git commands use the provided token
+
+      - name: Configure git author
+        run: |
+          git config user.name "org-level-automation-app[bot]"
+          git config user.email "41898282+org-level-automation-app[bot]@users.noreply.github.com"
+
+      - name: Create branch, add file, commit and push
+        id: push_branch
+        env:
+          APP_TOKEN: ${{ steps.app_token.outputs.token }}
+          FILENAME: ${{ github.event.inputs.filename }}
+          FILE_CONTENT: ${{ github.event.inputs.file_content }}
+        run: |
+          set -euo pipefail
+
+          # branch name: include run id to avoid collisions
+          BRANCH="gh-app/create-file-${GITHUB_RUN_ID}"
+
+          # create branch from current default branch (the checkout action checked out the repo)
+          git checkout -b "$BRANCH"
+
+          # create file
+          mkdir -p "$(dirname "$FILENAME")" || true
+          printf "%s\n" "$FILE_CONTENT" > "$FILENAME"
+
+          # add, commit, push
+          git add "$FILENAME"
+          git commit -m "chore: add ${FILENAME} (created by GitHub App)"
+          git push --set-upstream origin "$BRANCH"
+
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Create pull request (via REST API)
+        id: create_pr
+        env:
+          APP_TOKEN: ${{ steps.app_token.outputs.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ steps.push_branch.outputs.branch }}
+          BASE: ${{ github.event.inputs.base_branch }}
+        run: |
+          set -euo pipefail
+          API="https://api.github.com"
+          PAYLOAD=$(jq -n \
+            --arg title "chore: add $FILENAME (automated PR)" \
+            --arg head "$BRANCH" \
+            --arg base "$BASE" \
+            --arg body "Automated PR created by org-level-automation-app to add $FILENAME" \
+            '{ title: $title, head: $head, base: $base, body: $body }')
+
+          resp=$(curl -sSL -X POST \
+            -H "Authorization: Bearer $APP_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$API/repos/$REPO/pulls" \
+            -d "$PAYLOAD")
+
+          pr_number=$(echo "$resp" | jq -r .number)
+          pr_url=$(echo "$resp" | jq -r .html_url)
+          if [ "$pr_number" = "null" ] || [ -z "$pr_number" ]; then
+            echo "Failed creating PR: $resp"
+            exit 1
+          fi
+          echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
+          echo "pr_url=$pr_url" >> $GITHUB_OUTPUT
+          echo "Created PR #$pr_number: $pr_url"
+
+      - name: Merge pull request (via REST API)
+        env:
+          APP_TOKEN: ${{ steps.app_token.outputs.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          API="https://api.github.com"
+          PR_NUM="${{ steps.create_pr.outputs.pr_number }}"
+
+          # merge using merge method; can be "merge", "squash", or "rebase"
+          resp=$(curl -sSL -X PUT \
+            -H "Authorization: Bearer $APP_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$API/repos/${REPO}/pulls/${PR_NUM}/merge" \
+            -d '{"commit_title":"Merge PR by org-level-automation-app","merge_method":"merge"}')
+
+          merged=$(echo "$resp" | jq -r .merged)
+          if [ "$merged" != "true" ]; then
+            echo "Merge failed: $resp"
+            exit 1
+          fi
+          echo "PR #${PR_NUM} merged."
+
+      - name: (optional) Delete branch
+        if: always()
+        env:
+          APP_TOKEN: ${{ steps.app_token.outputs.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ steps.push_branch.outputs.branch }}
+        run: |
+          set -euo pipefail
+          API="https://api.github.com"
+          curl -sSL -X DELETE \
+            -H "Authorization: Bearer $APP_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$API/repos/${REPO}/git/refs/heads/${BRANCH}" || true
+          echo "Deleted branch ${BRANCH} (if it existed)."
