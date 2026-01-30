@@ -1,8 +1,8 @@
 # gha-actions
 
-This repository contains **reusable GitHub Actions workflows** built using a **GitHub App** to demonstrate secure, auditable automation.
+This repository contains reusable GitHub Actions workflows built using a GitHub App to demonstrate secure, auditable automation.
 
-The workflows use **short-lived GitHub App installation tokens** (generated per run using `APP_ID` and `APP_PRIVATE_KEY`) instead of long-lived PATs. For validation, a **SHA-256 fingerprint (first 12 characters only)** of the token is printed to confirm token rotation without exposing credentials.
+The workflows use short-lived GitHub App installation tokens (generated per run using `APP_ID` and `APP_PRIVATE_KEY`) instead of long-lived PATs. For validation, a SHA-256 fingerprint (first 12 characters only) of the token is printed to confirm token rotation without exposing credentials.
 
 ## Available Reusable Workflows
 
@@ -27,9 +27,9 @@ Creates a file on a new branch, opens a pull request, merges it to the base bran
 ---
 
 ## Security & Audit Notes
-- All actions are attributed to the **GitHub App**, not a user account.
-- A **new installation token is generated for every run** (tokens are not reused).
-- Only a **hashed token fingerprint** is logged for debugging purposes.
+- All actions are attributed to the GitHub App, not a user account.
+- A new installation token is generated for every run (tokens are not reused).
+- Only a hashed token fingerprint is logged for debugging purposes.
 - Required secrets (`APP_ID`, `APP_PRIVATE_KEY`) must be provided by the calling repository.
 
-These workflows are intended to illustrate **least-privilege access, clear system identity, and improved auditability** compared to PAT-based automation.
+These workflows are intended to illustrate least-privilege access, clear system identity, and improved auditability compared to PAT-based automation.
