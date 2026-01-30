@@ -1,6 +1,3 @@
-# gha-actions/.github/workflows/create-file-pr-merge.yml
-name: Reusable — create file, open PR, and merge (GitHub App)
-
 on:
   workflow_call:
     inputs:
