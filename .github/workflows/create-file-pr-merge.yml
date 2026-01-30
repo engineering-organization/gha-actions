@@ -1,81 +1,74 @@
-# .github/workflows/create-file-pr-merge.yml
-name: Create file, open PR, and merge (via GitHub App)
+# gha-actions/.github/workflows/create-file-pr-merge-reusable.yml
+name: Reusable — create file, open PR, and merge (GitHub App)
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       filename:
-        description: "Filename to create (relative to repo root)"
         required: true
-        default: "dummy.txt"
+        type: string
       file_content:
-        description: "Content for the new file"
         required: true
-        default: "This is a test file created by org-level-automation-app."
+        type: string
       base_branch:
-        description: "Target branch for the PR"
+        required: false
+        type: string
+        default: main
+    secrets:
+      APP_ID:
         required: true
-        default: "main"
+      APP_PRIVATE_KEY:
+        required: true
 
 jobs:
-  create-pr-and-merge:
+  create-file-pr-merge:
     runs-on: ubuntu-latest
     steps:
-      - name: Create App installation token
+      - name: Create GitHub App installation token
         id: app_token
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
-        # NOTE: Ensure the app's permissions (in the GitHub App configuration) include:
-        #   - Repository contents: Write
-        #   - Pull requests: Write
-        # and that the app is installed on this repository.
 
-      - name: Checkout repository using app token
+      - name: Checkout repository using App token
         uses: actions/checkout@v4
         with:
           token: ${{ steps.app_token.outputs.token }}
-          persist-credentials: true  # ensure git commands use the provided token
+          persist-credentials: true
 
-      - name: Configure git author
+      - name: Configure git identity
         run: |
           git config user.name "org-level-automation-app[bot]"
           git config user.email "41898282+org-level-automation-app[bot]@users.noreply.github.com"
 
-      - name: Create branch, add file, commit and push
+      - name: Create branch, file, commit and push
         id: push_branch
         env:
-          APP_TOKEN: ${{ steps.app_token.outputs.token }}
-          FILENAME: ${{ github.event.inputs.filename }}
-          FILE_CONTENT: ${{ github.event.inputs.file_content }}
+          FILENAME: ${{ inputs.filename }}
+          CONTENT: ${{ inputs.file_content }}
         run: |
           set -euo pipefail
+          BRANCH="gh-app-auto-${GITHUB_RUN_ID}"
+          git fetch origin ${{ inputs.base_branch }}:refs/remotes/origin/${{ inputs.base_branch }} || true
+          git checkout -b "$BRANCH" "origin/${{ inputs.base_branch }}" || git checkout -b "$BRANCH"
 
-          # branch name: include run id to avoid collisions
-          BRANCH="gh-app/create-file-${GITHUB_RUN_ID}"
-
-          # create branch from current default branch (the checkout action checked out the repo)
-          git checkout -b "$BRANCH"
-
-          # create file
           mkdir -p "$(dirname "$FILENAME")" || true
-          printf "%s\n" "$FILE_CONTENT" > "$FILENAME"
+          printf "%s\n" "$CONTENT" > "$FILENAME"
 
-          # add, commit, push
           git add "$FILENAME"
-          git commit -m "chore: add ${FILENAME} (created by GitHub App)"
+          git commit -m "chore: add $FILENAME via GitHub App"
           git push --set-upstream origin "$BRANCH"
 
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
-      - name: Create pull request (via REST API)
+      - name: Create pull request
         id: create_pr
         env:
-          APP_TOKEN: ${{ steps.app_token.outputs.token }}
+          TOKEN: ${{ steps.app_token.outputs.token }}
           REPO: ${{ github.repository }}
           BRANCH: ${{ steps.push_branch.outputs.branch }}
-          BASE: ${{ github.event.inputs.base_branch }}
+          BASE: ${{ inputs.base_branch }}
         run: |
           set -euo pipefail
           API="https://api.github.com"
@@ -87,7 +80,7 @@ jobs:
             '{ title: $title, head: $head, base: $base, body: $body }')
 
           resp=$(curl -sSL -X POST \
-            -H "Authorization: Bearer $APP_TOKEN" \
+            -H "Authorization: Bearer $TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "$API/repos/$REPO/pulls" \
             -d "$PAYLOAD")
@@ -102,18 +95,18 @@ jobs:
           echo "pr_url=$pr_url" >> $GITHUB_OUTPUT
           echo "Created PR #$pr_number: $pr_url"
 
-      - name: Merge pull request (via REST API)
+      - name: Merge pull request
         env:
-          APP_TOKEN: ${{ steps.app_token.outputs.token }}
+          TOKEN: ${{ steps.app_token.outputs.token }}
           REPO: ${{ github.repository }}
+          PR: ${{ steps.create_pr.outputs.pr_number }}
         run: |
           set -euo pipefail
           API="https://api.github.com"
-          PR_NUM="${{ steps.create_pr.outputs.pr_number }}"
-
-          # merge using merge method; can be "merge", "squash", or "rebase"
+          PR_NUM="${PR}"
+          # use "merge" / "squash" / "rebase" as desired
           resp=$(curl -sSL -X PUT \
-            -H "Authorization: Bearer $APP_TOKEN" \
+            -H "Authorization: Bearer $TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "$API/repos/${REPO}/pulls/${PR_NUM}/merge" \
             -d '{"commit_title":"Merge PR by org-level-automation-app","merge_method":"merge"}')
@@ -125,17 +118,17 @@ jobs:
           fi
           echo "PR #${PR_NUM} merged."
 
-      - name: (optional) Delete branch
+      - name: Delete branch
         if: always()
         env:
-          APP_TOKEN: ${{ steps.app_token.outputs.token }}
+          TOKEN: ${{ steps.app_token.outputs.token }}
           REPO: ${{ github.repository }}
           BRANCH: ${{ steps.push_branch.outputs.branch }}
         run: |
           set -euo pipefail
           API="https://api.github.com"
           curl -sSL -X DELETE \
-            -H "Authorization: Bearer $APP_TOKEN" \
+            -H "Authorization: Bearer $TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "$API/repos/${REPO}/git/refs/heads/${BRANCH}" || true
           echo "Deleted branch ${BRANCH} (if it existed)."
