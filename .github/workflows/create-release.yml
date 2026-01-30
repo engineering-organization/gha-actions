@@ -1,0 +1,32 @@
+# gha-actions/.github/workflows/create-release.yml
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create App installation token
+        id: app_token
+        uses: actions/create-github-app-token@v3
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Create GitHub release (via REST API)
+        env:
+          APP_TOKEN: ${{ steps.app_token.outputs.token }}
+          TAG: ${{ inputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          # create release using the installation token (no token printed to logs)
+          payload=$(jq -n --arg tag "$TAG" --arg name "$TAG" '{ tag_name: $tag, name: $name, body: "Release created by GitHub App POC" }')
+          curl -s -X POST \
+            -H "Authorization: Bearer $APP_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/$REPO/releases \
+            -d "$payload"
