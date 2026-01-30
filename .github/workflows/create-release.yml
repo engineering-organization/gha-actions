@@ -10,19 +10,10 @@ jobs:
   create-release:
     runs-on: ubuntu-latest
     steps:
-
-      - name: Verify APP_ID is present
-        run: |
-          if [ -z "${{ secrets.APP_ID }}" ]; then
-            echo "APP_ID is NOT set"
-            exit 1
-          else
-            echo "APP_ID is set"
-          fi
       
       - name: Create App installation token
         id: app_token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
