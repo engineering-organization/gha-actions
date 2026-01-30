@@ -19,14 +19,14 @@ jobs:
   create-file-pr-merge:
     runs-on: ubuntu-latest
     steps:
-      - name: Create App installation token
+      - name: Create App Installation Token
         id: app_token
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
-      - name: Debug – fingerprint GitHub App installation token (SAFE)
+      - name: Debug – Fingerprint GitHub App Installation Token
         env:
           TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
@@ -36,18 +36,13 @@ jobs:
           echo "Token fingerprint (sha256, first 12 chars):"
           echo -n "$TOKEN" | sha256sum | cut -c1-12
 
-      - name: Checkout repository using App token
+      - name: Checkout Repository Using App Token
         uses: actions/checkout@v4
         with:
           token: ${{ steps.app_token.outputs.token }}
           persist-credentials: true
 
-      - name: Configure git identity
-        run: |
-          git config user.name "org-level-automation-app[bot]"
-          git config user.email "41898282+org-level-automation-app[bot]@users.noreply.github.com"
-
-      - name: Create branch, file, commit and push
+      - name: Create Branch, File, Commit and Push
         id: push_branch
         env:
           FILENAME: ${{ inputs.filename }}
@@ -67,7 +62,7 @@ jobs:
 
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
-      - name: Create pull request
+      - name: Create Pull Request
         id: create_pr
         env:
           TOKEN: ${{ steps.app_token.outputs.token }}
@@ -101,7 +96,7 @@ jobs:
           echo "pr_url=$pr_url" >> $GITHUB_OUTPUT
           echo "Created PR #$pr_number: $pr_url"
 
-      - name: Merge pull request
+      - name: Merge Pull Request
         env:
           TOKEN: ${{ steps.app_token.outputs.token }}
           REPO: ${{ github.repository }}
@@ -124,7 +119,7 @@ jobs:
           fi
           echo "PR #${PR_NUM} merged."
 
-      - name: Delete branch
+      - name: Delete Branch
         if: always()
         env:
           TOKEN: ${{ steps.app_token.outputs.token }}
