@@ -64,6 +64,7 @@ jobs:
           REPO: ${{ github.repository }}
           BRANCH: ${{ steps.push_branch.outputs.branch }}
           BASE: ${{ inputs.base_branch }}
+          FILENAME: ${{ inputs.filename }}
         run: |
           set -euo pipefail
           API="https://api.github.com"
