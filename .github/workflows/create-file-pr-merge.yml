@@ -39,6 +39,11 @@ jobs:
           token: ${{ steps.app_token.outputs.token }}
           persist-credentials: true
 
+      - name: Configure git identity
+        run: |
+          git config user.name "org-level-automation-app[bot]"
+          git config user.email "41898282+org-level-automation-app[bot]@users.noreply.github.com"
+
       - name: Create Branch, File, Commit and Push
         id: push_branch
         env:
