@@ -10,14 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       
-      - name: Create App installation token
+      - name: Create App Installation Token
         id: app_token
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
-      - name: Debug – fingerprint GitHub App installation token (SAFE)
+      - name: Debug – Fingerprint GitHub App Installation Token
         env:
           TOKEN: ${{ steps.app_token.outputs.token }}
         run: |
@@ -27,7 +27,7 @@ jobs:
           echo "Token fingerprint (sha256, first 12 chars):"
           echo -n "$TOKEN" | sha256sum | cut -c1-12
 
-      - name: Create GitHub release (via REST API)
+      - name: Create GitHub Release (via REST API)
         env:
           APP_TOKEN: ${{ steps.app_token.outputs.token }}
           TAG: ${{ inputs.tag }}
