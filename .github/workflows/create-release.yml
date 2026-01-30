@@ -18,6 +18,16 @@ jobs:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
+      - name: Debug – fingerprint GitHub App installation token (SAFE)
+        env:
+          TOKEN: ${{ steps.app_token.outputs.token }}
+        run: |
+          set -euo pipefail
+          echo "Token length: ${#TOKEN}"
+
+          echo "Token fingerprint (sha256, first 12 chars):"
+          echo -n "$TOKEN" | sha256sum | cut -c1-12
+
       - name: Create GitHub release (via REST API)
         env:
           APP_TOKEN: ${{ steps.app_token.outputs.token }}
