@@ -1,4 +1,3 @@
-# gha-actions/.github/workflows/create-release.yml
 on:
   workflow_call:
     inputs:
