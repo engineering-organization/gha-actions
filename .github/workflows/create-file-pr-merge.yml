@@ -14,11 +14,6 @@ on:
         required: false
         type: string
         default: main
-    secrets:
-      APP_ID:
-        required: true
-      APP_PRIVATE_KEY:
-        required: true
 
 jobs:
   create-file-pr-merge:
