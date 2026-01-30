@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Create App installation token
         id: app_token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@v2
         with:
           app_id: ${{ secrets.APP_ID }}
           private_key: ${{ secrets.APP_PRIVATE_KEY }}
